@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tetris Showdown</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;700&display=swap');
+
+        :root {
+            --neon-blue: #00f0ff;
+            --neon-pink: #ff0055;
+            --neon-purple: #7000ff;
+            --neon-yellow: #ffe600;
+            --neon-green: #00ff66;
+            --bg-dark: #070913;
+            --card-bg: rgba(18, 24, 43, 0.85);
+            --border-glow: rgba(0, 240, 255, 0.4);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: var(--bg-dark);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 50% 20%, rgba(112, 0, 255, 0.15), transparent 60%),
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Orbitron', sans-serif;
+            margin: 10px 0;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
+        }
+
+        .screen { display: none; width: 100%; max-width: 1200px; padding: 20px; box-sizing: border-box; }
+        .active { display: flex; flex-direction: column; align-items: center; }
+
+        /* UI Controls */
+        input[type="text"] {
+            padding: 12px 15px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: 2px solid var(--neon-blue);
+            background: rgba(5, 10, 25, 0.9);
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 15px;
+            text-align: center;
+            outline: none;
+            box-shadow: inset 0 0 10px rgba(0,240,255,0.2);
+            width: 100%;
+        }
+        input[type="text"]:focus {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 12px var(--neon-pink);
+        }
+
+        button {
+            padding: 12px 20px;
+            margin: 6px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(112, 0, 255, 0.4));
+            color: #fff;
+            border: 2px solid var(--neon-blue);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(0,240,255,0.3);
+            letter-spacing: 1px;
+        }
+        button:hover {
+            background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-blue);
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #222533;
+            border-color: #444a66;
+            color: #666e88;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .menu-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border-glow);
+            padding: 22px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 240, 255, 0.05);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Sudden Death Header Bar */
+        #sudden-death-bar {
+            display: none;
+            width: 100%;
+            max-width: 800px;
+            background: rgba(255, 0, 85, 0.15);
+            border: 2px solid var(--neon-pink);
+            border-radius: 8px;
+            padding: 10px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 0 20px rgba(255,0,85,0.4);
+            animation: pulse-sd 1.5s infinite alternate;
+        }
+        @keyframes pulse-sd {
+            from { box-shadow: 0 0 10px rgba(255,0,85,0.3); }
+            to { box-shadow: 0 0 25px rgba(255,0,85,0.8); }
+        }
+        .sd-title {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-pink);
+            font-size: 18px;
+            font-weight: 900;
+            text-align: center;
+            text-shadow: 0 0 8px var(--neon-pink);
+        }
+        .timer-progress-bg {
+            width: 100%;
+            height: 12px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--neon-pink);
+            margin-top: 8px;
+        }
+        .timer-progress-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, var(--neon-yellow), var(--neon-pink));
+            transition: width 1s linear;
+        }
+
+        /* Game Layout */
+        #game-layout { display: flex; flex-wrap: wrap; width: 100%; justify-content: center; gap: 20px; position: relative; }
+        #main-player { display: flex; flex-direction: column; align-items: center; }
+        .board-container { display: flex; gap: 15px; align-items: flex-start; }
+        
+        canvas {
+            background-color: #030611;
+            border: 2px solid var(--neon-blue);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+        }
+        #tetris { height: 60vh; max-height: 520px; }
+        #next-piece { width: 90px; height: 90px; }
+
+        /* Opponents */
+        #opponents-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            max-width: 650px;
+            max-height: 65vh;
+            overflow-y: auto;
+            padding: 10px;
+            background: rgba(5, 10, 25, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        #opponents-container::-webkit-scrollbar { width: 6px; }
+        #opponents-container::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 3px; }
+
+        .opponent {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--card-bg);
+            border: 1px solid rgba(0,240,255,0.2);
+            padding: 8px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .opponent canvas { height: 130px; border: 1px solid #333; box-shadow: none; }
+        .opponent-name {
+            font-size: 12px;
+            font-family: 'Orbitron', sans-serif;
+            margin-bottom: 4px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+            width: 80px;
+            text-align: center;
+            color: #a0aec0;
+        }
+        .opponent.is-bot .opponent-name { color: var(--neon-yellow); }
+        .target-btn {
+            font-size: 10px;
+            padding: 4px 8px;
+            margin-top: 4px;
+            background: rgba(255,0,85,0.2);
+            border: 1px solid var(--neon-pink);
+            color: var(--neon-pink);
+        }
+        .target-btn.selected {
+            background: var(--neon-pink);
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 10px var(--neon-pink);
+        }
+
+        /* Controls */
+        .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; width: 100%; max-width: 320px; }
+        .controls button { padding: 14px; font-size: 18px; touch-action: manipulation; margin: 0; }
+        .attack-btn {
+            background: linear-gradient(135deg, rgba(255,0,85,0.4), rgba(255,0,0,0.8)) !important;
+            border-color: var(--neon-pink) !important;
+        }
+        .attack-btn:active { background: var(--neon-pink) !important; }
+
+        /* Stats HUD */
+        .stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 15px;
+            font-family: 'Orbitron', sans-serif;
+            background: var(--card-bg);
+            border: 1px solid var(--border-glow);
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 130px;
+        }
+        .trophy { color: var(--neon-yellow); font-weight: bold; }
+        .charge-text { color: var(--neon-green); font-weight: bold; }
+        .alive-badge { color: var(--neon-blue); font-weight: bold; }
+
+        /* Lobby list */
+        #room-id-display { font-size: 20px; font-weight: bold; color: var(--neon-pink); user-select: all; margin: 8px 0; font-family: 'Orbitron', sans-serif;}
+        #qr-code { background: white; padding: 10px; border-radius: 8px; margin: 10px auto; display: none; }
+        .player-list { list-style: none; padding: 0; width: 100%; max-width: 350px; max-height: 200px; overflow-y: auto; }
+        .player-list li {
+            background: rgba(20, 30, 55, 0.8);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            margin: 4px 0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        /* Tutorial Overlay */
+        #tutorial-box {
+            display: none;
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 25, 45, 0.95);
+            border: 2px solid var(--neon-blue);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 100;
+            text-align: center;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 0 25px rgba(0,240,255,0.6);
+        }
+
+        /* Audio Tracks Storage */
+        .audio-status { font-size: 12px; color: var(--neon-green); margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-menu" class="screen active">
+        <h1>Tetris Showdown</h1>
+        <div class="menu-box">
+            <h3>Player Profile</h3>
+            <input type="text" id="player-name" placeholder="ENTER CALLSIGN" maxlength="12">
+            <div style="margin-top: 10px;"><span class="trophy">🏆 TROPHIES: <span id="menu-trophies">0</span></span></div>
+        </div>
+
+        <div class="menu-box">
+            <h3>Game Modes</h3>
+            <button onclick="startSoloGame()" style="background: linear-gradient(135deg, #7000ff, #00f0ff); width: 90%;">Battle Bots (Solo vs 99 AI)</button>
+            <button onclick="startTutorial()" style="background: linear-gradient(135deg, #00ff66, #00f0ff); color: #000; width: 90%; margin-top: 10px;">Training Tutorial</button>
+        </div>
+
+        <div class="menu-box">
+            <h3>Multiplayer Battle Royale</h3>
+            <button id="btn-create" onclick="createRoom()">Online Auto Matchmaking (10s)</button>
+            <hr style="border: 0; height: 1px; background: var(--border-glow); margin: 15px 0;">
+            <input type="text" id="room-id-input" placeholder="ENTER ROOM ID">
+            <button id="btn-join" onclick="joinRoom()">Join Match</button>
+            <p id="menu-status" style="color: var(--neon-yellow); font-size: 13px;"></p>
+        </div>
+    </div>
+
+    <div id="screen-lobby" class="screen">
+        <h2>Match Lobby</h2>
+        <p>ROOM CODE (CLICK TO SHARE):</p>
+        <div id="room-id-display">CONNECTING...</div>
+        <div id="qr-code"></div>
+        
+        <h3>PLAYERS CONNECTED (<span id="player-count">1</span>/100)</h3>
+        <p style="font-size: 12px; color: #a0aec0;">*Online matchmaking launches automatically after 10 seconds. Empty slots are filled with Cyber-Bots.</p>
+        <p id="matchmaking-status" style="font-family:'Orbitron',sans-serif; color:var(--neon-yellow); font-size:13px;">MATCHMAKING: WAITING...</p>
+        <ul class="player-list" id="lobby-players"></ul>
+        
+        <button id="btn-start" onclick="startGame()" style="display:none; background: linear-gradient(135deg, var(--neon-green), #00b344); color:#000;">Launch Match</button>
+        <button onclick="leaveRoom()">Disconnect</button>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <!-- Sudden Death Bar -->
+        <div id="sudden-death-bar">
+            <div class="sd-title">⚠️ SUDDEN DEATH MODE ⚠️ - TIME REMAINING: <span id="sd-timer">03:00</span></div>
+            <div class="timer-progress-bg">
+                <div class="timer-progress-fill" id="sd-progress"></div>
+            </div>
+        </div>
+
+        <div id="game-layout">
+            
+            <div id="tutorial-box">
+                <h3 id="tut-title" style="margin-top:0; color:var(--neon-blue);">Tutorial Step</h3>
+                <p id="tut-msg" style="font-size: 16px; line-height: 1.4;"></p>
+                <button id="tut-btn" onclick="advanceTutorial()">Next</button>
+            </div>
+
+            <div id="main-player">
+                <div class="board-container">
+                    <canvas id="tetris" width="240" height="400"></canvas>
+                    <div class="stats">
+                        <div>NEXT:</div>
+                        <canvas id="next-piece" width="80" height="80"></canvas>
+                        <div>SCORE: <br><span id="score" style="color:var(--neon-blue)">0</span></div>
+                        <div class="charge-text">ATTACK: <br><span id="charge">0</span></div>
+                        <div class="alive-badge">ALIVE: <br><span id="alive-count" style="color:var(--neon-yellow)">100</span>/100</div>
+                        <div>TARGET: <br><span id="current-target-name" style="color:var(--neon-pink); font-size: 11px;">None</span></div>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button onclick="playerRotate(-1)">↺</button>
+                    <button class="rotate" onclick="playerRotate(1)">↻</button>
+                    <button class="attack-btn" onclick="triggerAttack()">⚔️</button>
+                    
+                    <button onclick="playerMove(-1)">←</button>
+                    <button onclick="playerHardDrop()">⬇️</button>
+                    <button onclick="playerMove(1)">→</button>
+                </div>
+            </div>
+            
+            <div id="opponents-container"></div>
+        </div>
+    </div>
+
+    <div id="screen-end" class="screen">
+        <h1 id="end-title">Game Over</h1>
+        <h3 id="end-subtitle"></h3>
+        <div class="menu-box">
+            <button id="btn-continue" onclick="continueToLobby()" style="display:none;">Return to Lobby</button>
+            <button onclick="leaveRoom()">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- AUDIO SYSTEM: 100P / 50P / 10P / 2P dynamic OST -->
+    <script>
+        const MUSIC_100 = "Tetris showodwn OST - 100 Players left.mp3";
+        const MUSIC_50  = "Tetris showdown OST - 50 players left.mp3";
+        const MUSIC_10  = "Tetris showdown OST - 10 players left.mp3";
+        const MUSIC_2   = "Tetris showdown OST - 2 Players left.mp3";
+
+        const audioTracks = {
+            [MUSIC_100]: new Audio(MUSIC_100),
+            [MUSIC_50]: new Audio(MUSIC_50),
+            [MUSIC_10]: new Audio(MUSIC_10),
+            [MUSIC_2]: new Audio(MUSIC_2)
+        };
+
+        Object.values(audioTracks).forEach(track => {
+            track.loop = true;
+            track.volume = 0.6;
+            track.preload = "auto";
+        });
+
+        let currentTrackUrl = null;
+        let audioUnlocked = false;
+
+        function unlockAudioSystem() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+            Object.values(audioTracks).forEach(track => {
+                track.play().then(() => {
+                    track.pause();
+                    track.currentTime = 0;
+                }).catch(() => {});
+            });
+        }
+
+        document.addEventListener('click', unlockAudioSystem, { once: false });
+        document.addEventListener('keydown', unlockAudioSystem, { once: false });
+        document.addEventListener('touchstart', unlockAudioSystem, { once: false });
+
+        function playMusicTrack(trackUrl) {
+            if (currentTrackUrl === trackUrl) return;
+            stopMusic();
+            currentTrackUrl = trackUrl;
+            const track = audioTracks[trackUrl];
+            if (track) {
+                track.currentTime = 0;
+                track.play().catch(e => console.log("Audio play deferred:", e));
+            }
+        }
+
+        function stopMusic() {
+            if (currentTrackUrl && audioTracks[currentTrackUrl]) {
+                audioTracks[currentTrackUrl].pause();
+                audioTracks[currentTrackUrl].currentTime = 0;
+            }
+            currentTrackUrl = null;
+        }
+
+        function updateMusicForAliveCount(count) {
+            if (isTutorial) return;
+            if (count <= 2) playMusicTrack(MUSIC_2);
+            else if (count <= 10) playMusicTrack(MUSIC_10);
+            else if (count <= 50) playMusicTrack(MUSIC_50);
+            else playMusicTrack(MUSIC_100);
+        }
+    </script>
+
+    <script>
+        // --- GLOBAL STATE ---
+        let peer = null;
+        let connections = {}; 
+        let hostConn = null;  
+        let isHost = false;
+        let isSolo = false;
+        let isTutorial = false;
+        let tutorialStep = 0;
+        let myId = '';
+        let myName = '';
+        let myTrophies = parseInt(localStorage.getItem('tetrisTrophies')) || 0;
+        
+        let playersData = {}; // Stores human and bot player states
+        let botIntervals = []; // AI update timers
+        let targetId = null;
+        let gameState = 'MENU';
+
+        // Automatic online matchmaking state
+        let matchmakingInterval = null;
+        let matchmakingSecondsLeft = 10;
+
+        // Sudden Death State
+        let isSuddenDeath = false;
+        let suddenDeathTimer = 180; // 3 mins in seconds
+        let suddenDeathInterval = null;
+
+        // Mechanics & permanent Garbage Lines
+        let attackCharge = 0;
+        let nextPieceMatrix = null;
+
+        // UI & Canvases
+        const screens = {
+            menu: document.getElementById('screen-menu'),
+            lobby: document.getElementById('screen-lobby'),
+            game: document.getElementById('screen-game'),
+            end: document.getElementById('screen-end')
+        };
+        const statusTxt = document.getElementById('menu-status');
+        const opponentsContainer = document.getElementById('opponents-container');
+        document.getElementById('menu-trophies').innerText = myTrophies;
+
+        // --- TETRIS ENGINE ---
+        const canvas = document.getElementById('tetris');
+        const context = canvas.getContext('2d');
+        context.scale(20, 20);
+
+        const nextCanvas = document.getElementById('next-piece');
+        const nextCtx = nextCanvas.getContext('2d');
+        nextCtx.scale(20, 20);
+
+        // Neon Matrix Palette (8 = permanent garbage)
+        const colors = [
+            null, 
+            '#00f0ff', // I (Cyan)
+            '#ff0055', // L (Pink)
+            '#7000ff', // J (Purple)
+            '#ffe600', // O (Yellow)
+            '#00ff66', // Z (Green)
+            '#ff9900', // S (Orange)
+            '#0099ff', // T (Blue)
+            '#555566'  // 8 = Garbage Block
+        ]; 
+
+        let arena = createMatrix(12, 20);
+        let player = { pos: {x: 0, y: 0}, matrix: null, score: 0 };
+        let dropCounter = 0;
+        let dropInterval = 1000;
+        let lastTime = 0;
+        let animationId = null;
+
+        function createMatrix(w, h) {
+            const matrix = [];
+            while (h--) matrix.push(new Array(w).fill(0));
+            return matrix;
+        }
+
+        function createRandomPiece() {
+            const pieces = 'ILJOTSZ';
+            return pieces[pieces.length * Math.random() | 0];
+        }
+
+        function createPiece(type) {
+            if (type === 'I') return [[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]];
+            if (type === 'L') return [[0, 2, 0], [0, 2, 0], [0, 2, 2]];
+            if (type === 'J') return [[0, 3, 0], [0, 3, 0], [3, 3, 0]];
+            if (type === 'O') return [[4, 4], [4, 4]];
+            if (type === 'Z') return [[5, 5, 0], [0, 5, 5], [0, 0, 0]];
+            if (type === 'S') return [[0, 6, 6], [6, 6, 0], [0, 0, 0]];
+            if (type === 'T') return [[0, 7, 0], [7, 7, 7], [0, 0, 0]];
+        }
+
+        function draw() {
+            context.fillStyle = '#030611';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawMatrix(arena, {x: 0, y: 0}, context);
+            drawMatrix(player.matrix, player.pos, context);
+            
+            for (let id in playersData) {
+                if (id !== myId) drawOpponent(id);
+            }
+        }
+
+        function drawNextPiece() {
+            nextCtx.fillStyle = '#030611';
+            nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+            if (!nextPieceMatrix) return;
+            
+            const offsetX = nextPieceMatrix[0].length === 4 ? 0 : (nextPieceMatrix[0].length === 2 ? 1 : 0.5);
+            const offsetY = nextPieceMatrix.length === 2 ? 1 : 0.5;
+            drawMatrix(nextPieceMatrix, {x: offsetX, y: offsetY}, nextCtx);
+        }
+
+        function drawMatrix(matrix, offset, ctx) {
+            matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        ctx.fillStyle = colors[value];
+                        ctx.fillRect(x + offset.x, y + offset.y, 0.9, 0.9);
+                        ctx.shadowColor = colors[value];
+                        ctx.shadowBlur = 4;
+                    }
+                });
+            });
+            ctx.shadowBlur = 0; // reset
+        }
+
+        function merge(arena, player) {
+            player.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        arena[y + player.pos.y][x + player.pos.x] = value;
+                    }
+                });
+            });
+            broadcastBoard();
+        }
+
+        function collide(arena, player) {
+            const [m, o] = [player.matrix, player.pos];
+            for (let y = 0; y < m.length; ++y) {
+                for (let x = 0; x < m[y].length; ++x) {
+                    if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function playerReset() {
+            if (!nextPieceMatrix) nextPieceMatrix = createPiece(createRandomPiece());
+            player.matrix = nextPieceMatrix;
+            nextPieceMatrix = createPiece(createRandomPiece());
+            drawNextPiece();
+
+            player.pos.y = 0;
+            player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+            
+            if (collide(arena, player)) {
+                arena.forEach(row => row.fill(0));
+                
+                if (isSolo || isTutorial) {
+                    showEndScreen(false);
+                } else {
+                    playersData[myId].alive = false;
+                    updateAliveCount();
+                    autoSwitchTarget();
+                    sendNetworkMessage({ type: 'DIED', id: myId });
+                    showEndScreen(false); 
+                    if (isHost) checkMatchConditions();
+                }
+            }
+            broadcastBoard();
+        }
+
+        function arenaSweep() {
+            let rowCount = 0;
+            outer: for (let y = arena.length - 1; y > 0; --y) {
+                for (let x = 0; x < arena[y].length; ++x) {
+                    if (arena[y][x] === 0) continue outer;
+                }
+                const row = arena.splice(y, 1)[0].fill(0);
+                arena.unshift(row);
+
+                ++y;
+                rowCount++;
+            }
+            if (rowCount > 0) {
+                player.score += [0, 10, 30, 50, 80][rowCount] || 100;
+                attackCharge += rowCount;
+                document.getElementById('score').innerText = player.score;
+                document.getElementById('charge').innerText = attackCharge;
+            }
+        }
+
+        // Garbage rows are permanent until they are completed as a horizontal line.
+        function triggerAttack() {
+            if(gameState !== 'PLAYING') return;
+            
+            if (isTutorial && tutorialStep === 8) advanceTutorial();
+
+            if (attackCharge > 0 && targetId && playersData[targetId] && playersData[targetId].alive) {
+                sendNetworkMessage({ 
+                    type: 'GARBAGE', 
+                    target: targetId, 
+                    lines: attackCharge 
+                });
+                
+                if (playersData[targetId].isBot && isHost) {
+                    receiveBotGarbage(targetId, attackCharge);
+                }
+
+                attackCharge = 0;
+                document.getElementById('charge').innerText = attackCharge;
+            }
+        }
+
+        function receiveGarbage(lines) {
+            if(gameState !== 'PLAYING' || (playersData[myId] && !playersData[myId].alive)) return;
+            for (let i = 0; i < lines; i++) {
+                arena.shift(); 
+                let newRow = new Array(12).fill(8); 
+                newRow[Math.floor(Math.random() * 12)] = 0; // single gap
+                arena.push(newRow);
+            }
+            broadcastBoard();
+        }
+
+        function playerDrop() {
+            if(gameState !== 'PLAYING') return;
+            player.pos.y++;
+            if (collide(arena, player)) {
+                player.pos.y--;
+                merge(arena, player);
+                playerReset();
+                arenaSweep();
+            }
+            dropCounter = 0;
+        }
+
+        function playerHardDrop() {
+            if(gameState !== 'PLAYING') return;
+            
+            if (isTutorial && tutorialStep === 4) advanceTutorial();
+
+            while (!collide(arena, player)) {
+                player.pos.y++;
+            }
+            player.pos.y--;
+            merge(arena, player);
+            playerReset();
+            arenaSweep();
+            dropCounter = 0;
+        }
+
+        function playerMove(dir) {
+            if(gameState !== 'PLAYING') return;
+            if (isTutorial && tutorialStep === 2) advanceTutorial();
+
+            player.pos.x += dir;
+            if (collide(arena, player)) player.pos.x -= dir;
+        }
+
+        function playerRotate(dir) {
+            if(gameState !== 'PLAYING') return;
+            if (isTutorial && tutorialStep === 3) advanceTutorial();
+
+            const pos = player.pos.x;
+            let offset = 1;
+            rotate(player.matrix, dir);
+            while (collide(arena, player)) {
+                player.pos.x += offset;
+                offset = -(offset + (offset > 0 ? 1 : -1));
+                if (offset > player.matrix[0].length) {
+                    rotate(player.matrix, -dir);
+                    player.pos.x = pos;
+                    return;
+                }
+            }
+        }
+
+        function rotate(matrix, dir) {
+            for (let y = 0; y < matrix.length; ++y) {
+                for (let x = 0; x < y; ++x) {
+                    [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+                }
+            }
+            if (dir > 0) matrix.forEach(row => row.reverse());
+            else matrix.reverse();
+        }
+
+        function update(time = 0) {
+            if (gameState !== 'PLAYING') return;
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            dropCounter += deltaTime;
+            if (dropCounter > dropInterval) {
+                playerDrop();
+            }
+
+            draw();
+            animationId = requestAnimationFrame(update);
+        }
+
+        // --- SMART BOT AI SYSTEM ---
+        function fillWithBots() {
+            const currentCount = Object.keys(playersData).length;
+            const botsNeeded = 100 - currentCount;
+            
+            for (let i = 1; i <= botsNeeded; i++) {
+                const botId = 'bot_' + Math.random().toString(36).substring(2, 9);
+                const botNames = ["CyberNaut", "Vortex", "TetraBot", "AEX_9", "Glitch", "MatrixAI", "NeonPulse", "ByteCrusher", "ZeroOne", "Krypton"];
+                const randomName = botNames[Math.floor(Math.random() * botNames.length)] + "_" + Math.floor(Math.random() * 999);
+                
+                playersData[botId] = {
+                    name: randomName,
+                    trophies: Math.floor(Math.random() * 50),
+                    alive: true,
+                    isBot: true,
+                    board: createMatrix(12, 20)
+                };
+            }
+        }
+
+        function startBotSimulation() {
+            stopBotSimulation();
+            if (!isHost) return;
+
+            for (let id in playersData) {
+                if (playersData[id].isBot) {
+                    // Create an individual loop for each bot
+                    let interval = setInterval(() => {
+                        if (gameState !== 'PLAYING') return;
+                        simBotAction(id);
+                    }, 1200 + Math.random() * 1500); // Bots place pieces every 1.2s - 2.7s
+                    
+                    botIntervals.push(interval);
+                }
+            }
+        }
+
+        function stopBotSimulation() {
+            botIntervals.forEach(clearInterval);
+            botIntervals = [];
+        }
+
+        // Smart bot placement: evaluates rotations and columns instead of choosing a random X.
+        function cloneMatrix(matrix) {
+            return matrix.map(row => row.slice());
+        }
+
+        function botCollision(board, matrix, posX, posY) {
+            for (let r = 0; r < matrix.length; r++) {
+                for (let c = 0; c < matrix[r].length; c++) {
+                    if (matrix[r][c] === 0) continue;
+                    const x = posX + c;
+                    const y = posY + r;
+                    if (x < 0 || x >= 12 || y >= 20) return true;
+                    if (y >= 0 && board[y][x] !== 0) return true;
+                }
+            }
+            return false;
+        }
+
+        function getUniqueRotations(matrix) {
+            const rotations = [];
+            const seen = new Set();
+            let current = cloneMatrix(matrix);
+            for (let i = 0; i < 4; i++) {
+                const key = JSON.stringify(current);
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    rotations.push(cloneMatrix(current));
+                }
+                rotate(current, 1);
+            }
+            return rotations;
+        }
+
+        function simulateBotPlacement(board, matrix, posX) {
+            let posY = -4;
+            while (!botCollision(board, matrix, posX, posY + 1)) posY++;
+
+            // Any occupied cell still above the board means this placement tops out.
+            for (let r = 0; r < matrix.length; r++) {
+                for (let c = 0; c < matrix[r].length; c++) {
+                    if (matrix[r][c] !== 0 && posY + r < 0) return null;
+                }
+            }
+
+            const simulated = cloneMatrix(board);
+            for (let r = 0; r < matrix.length; r++) {
+                for (let c = 0; c < matrix[r].length; c++) {
+                    if (matrix[r][c] !== 0) simulated[posY + r][posX + c] = matrix[r][c];
+                }
+            }
+
+            const garbageBefore = simulated.flat().filter(v => v === 8).length;
+            const clearedLines = botSweepBoard(simulated);
+            const garbageAfter = simulated.flat().filter(v => v === 8).length;
+            return { board: simulated, posY, clearedLines, garbageCleared: garbageBefore - garbageAfter };
+        }
+
+        function evaluateBotBoard(board, clearedLines, garbageCleared) {
+            const heights = new Array(12).fill(0);
+            let holes = 0;
+            let aggregateHeight = 0;
+            let maxHeight = 0;
+
+            for (let x = 0; x < 12; x++) {
+                let firstBlock = -1;
+                for (let y = 0; y < 20; y++) {
+                    if (board[y][x] !== 0) {
+                        if (firstBlock === -1) firstBlock = y;
+                    } else if (firstBlock !== -1) {
+                        holes++;
+                    }
+                }
+                heights[x] = firstBlock === -1 ? 0 : 20 - firstBlock;
+                aggregateHeight += heights[x];
+                maxHeight = Math.max(maxHeight, heights[x]);
+            }
+
+            let bumpiness = 0;
+            for (let x = 0; x < 11; x++) bumpiness += Math.abs(heights[x] - heights[x + 1]);
+
+            // Strongly reward clears and garbage removal; heavily punish holes and dangerous height.
+            return (
+                clearedLines * 12.0 +
+                garbageCleared * 3.5 -
+                aggregateHeight * 0.42 -
+                holes * 7.5 -
+                bumpiness * 0.48 -
+                maxHeight * 1.15
+            );
+        }
+
+        function botPlacePiece(board) {
+            const pieceType = createRandomPiece();
+            const baseMatrix = createPiece(pieceType);
+            const rotations = getUniqueRotations(baseMatrix);
+            let best = null;
+
+            for (const matrix of rotations) {
+                for (let x = -matrix[0].length; x < 12; x++) {
+                    // Skip columns where an occupied cell would be outside the board at all heights.
+                    let hasOutOfBoundsCell = false;
+                    for (let r = 0; r < matrix.length && !hasOutOfBoundsCell; r++) {
+                        for (let c = 0; c < matrix[r].length; c++) {
+                            if (matrix[r][c] !== 0 && (x + c < 0 || x + c >= 12)) {
+                                hasOutOfBoundsCell = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (hasOutOfBoundsCell) continue;
+
+                    const result = simulateBotPlacement(board, matrix, x);
+                    if (!result) continue;
+                    const score = evaluateBotBoard(result.board, result.clearedLines, result.garbageCleared);
+                    if (!best || score > best.score) {
+                        best = { score, matrix: cloneMatrix(matrix), x, y: result.posY };
+                    }
+                }
+            }
+
+            if (!best) return false;
+
+            for (let r = 0; r < best.matrix.length; r++) {
+                for (let c = 0; c < best.matrix[r].length; c++) {
+                    if (best.matrix[r][c] !== 0) {
+                        board[best.y + r][best.x + c] = best.matrix[r][c];
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Bot checks and clears completed lines
+        function botSweepBoard(board) {
+            let clearedLines = 0;
+            for (let y = board.length - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    board.splice(y, 1);
+                    board.unshift(new Array(12).fill(0));
+                    clearedLines++;
+                    y++; // Re-check same row index after shift
+                }
+            }
+            return clearedLines;
+        }
+
+        function simBotAction(botId) {
+            const bot = playersData[botId];
+            if (!bot || !bot.alive) return;
+
+            let board = bot.board;
+            let success = botPlacePiece(board);
+
+            if (!success) {
+                bot.alive = false;
+                updateAliveCount();
+                autoSwitchTarget();
+                sendNetworkMessage({ type: 'DIED', id: botId });
+                checkMatchConditions();
+                return;
+            }
+
+            let linesCleared = botSweepBoard(board);
+
+            // Bot ONLY attacks if lines were actually cleared!
+            if (linesCleared > 0) {
+                let targets = Object.keys(playersData).filter(pId => pId !== botId && playersData[pId].alive);
+                if (targets.length > 0) {
+                    let randomTarget = targets[Math.floor(Math.random() * targets.length)];
+                    if (randomTarget === myId) {
+                        receiveGarbage(linesCleared);
+                    } else if (playersData[randomTarget].isBot) {
+                        receiveBotGarbage(randomTarget, linesCleared);
+                    } else if (connections[randomTarget]) {
+                        connections[randomTarget].send({ type: 'GARBAGE', target: randomTarget, lines: linesCleared });
+                    }
+                }
+            }
+
+            // Check if Bot topped out after placement
+            if (board[0].some(val => val !== 0)) {
+                bot.alive = false;
+                updateAliveCount();
+                autoSwitchTarget();
+                sendNetworkMessage({ type: 'DIED', id: botId });
+                checkMatchConditions();
+            } else {
+                broadcastBoard(botId, board);
+            }
+        }
+
+        function receiveBotGarbage(botId, lines) {
+            let bot = playersData[botId];
+            if (!bot || !bot.alive) return;
+            for (let i = 0; i < lines; i++) {
+                bot.board.shift();
+                let newRow = new Array(12).fill(8);
+                newRow[Math.floor(Math.random() * 12)] = 0;
+                bot.board.push(newRow);
+            }
+            broadcastBoard(botId, bot.board);
+        }
+
+        // --- MULTIPLAYER & NETWORKING ---
+
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+        }
+
+        function initPlayerInfo() {
+            myName = document.getElementById('player-name').value.trim() || 'CYBER_' + Math.floor(Math.random()*1000);
+            playersData = {};
+            targetId = null;
+        }
+
+        function setMatchmakingStatus(message) {
+            const el = document.getElementById('matchmaking-status');
+            if (el) el.innerText = message;
+        }
+
+        function cancelAutoMatchmakingCountdown() {
+            if (matchmakingInterval) clearInterval(matchmakingInterval);
+            matchmakingInterval = null;
+        }
+
+        function broadcastMatchmakingTick() {
+            if (isHost && !isSolo) {
+                sendNetworkMessage({ type: 'MATCHMAKING_TICK', seconds: matchmakingSecondsLeft });
+            }
+        }
+
+        function prepareLobbyForMatchmaking() {
+            if (!isHost || isSolo || isTutorial) return;
+            // A new queue keeps connected humans but removes bots from the previous match.
+            for (const id of Object.keys(playersData)) {
+                if (playersData[id].isBot) {
+                    delete playersData[id];
+                } else {
+                    playersData[id].alive = true;
+                    playersData[id].board = createMatrix(12, 20);
+                    delete playersData[id].ctx;
+                }
+            }
+            updateLobbyUI();
+            broadcastLobbyState();
+        }
+
+        function startAutoMatchmakingCountdown() {
+            if (!isHost || isSolo || isTutorial) return;
+            cancelAutoMatchmakingCountdown();
+            prepareLobbyForMatchmaking();
+            matchmakingSecondsLeft = 10;
+            gameState = 'LOBBY';
+            setMatchmakingStatus(`MATCHMAKING: ${matchmakingSecondsLeft}s — waiting for players...`);
+            broadcastMatchmakingTick();
+
+            matchmakingInterval = setInterval(() => {
+                if (gameState !== 'LOBBY') {
+                    cancelAutoMatchmakingCountdown();
+                    return;
+                }
+                matchmakingSecondsLeft--;
+                setMatchmakingStatus(`MATCHMAKING: ${Math.max(0, matchmakingSecondsLeft)}s — waiting for players...`);
+                broadcastMatchmakingTick();
+                if (matchmakingSecondsLeft <= 0) startGame();
+            }, 1000);
+        }
+
+        function createRoom() {
+            initPlayerInfo();
+            isSolo = false;
+            isTutorial = false;
+            statusTxt.innerText = "Initializing Peer Relay...";
+            document.getElementById('btn-create').disabled = true;
+            
+            peer = new Peer();
+            peer.on('open', (id) => {
+                isHost = true;
+                myId = id;
+                document.getElementById('room-id-display').innerText = id;
+                document.getElementById('btn-start').style.display = 'none';
+                document.getElementById('btn-continue').style.display = 'inline-block';
+                document.getElementById('btn-continue').innerText = 'Lobby (Host)';
+                document.getElementById('btn-continue').onclick = continueToLobby;
+                
+                const qrContainer = document.getElementById('qr-code');
+                qrContainer.innerHTML = '';
+                qrContainer.style.display = 'inline-block';
+                new QRCode(qrContainer, {
+                    text: id,
+                    width: 120,
+                    height: 120,
+                    colorDark : "#00f0ff",
+                    colorLight : "#030611",
+                    correctLevel : QRCode.CorrectLevel.L
+                });
+
+                addPlayerToLobby(myId, myName, myTrophies);
+                gameState = 'LOBBY';
+                switchScreen('lobby');
+                startAutoMatchmakingCountdown();
+            });
+
+            peer.on('connection', (conn) => {
+                if(Object.keys(connections).length >= 99) {
+                    conn.send({type: 'ERROR', msg: 'Match Room Full (100 Max)'});
+                    setTimeout(() => conn.close(), 500);
+                    return;
+                }
+                if (gameState === 'PLAYING') {
+                    conn.send({type: 'ERROR', msg: 'Match already in progress'});
+                    setTimeout(() => conn.close(), 500);
+                    return;
+                }
+                connections[conn.peer] = conn;
+                conn.on('data', (data) => handleNetworkData(data, conn.peer));
+                conn.on('close', () => { delete connections[conn.peer]; removePlayer(conn.peer); });
+            });
+        }
+
+        function joinRoom() {
+            const roomId = document.getElementById('room-id-input').value.trim();
+            if (!roomId) return alert("Enter Room ID");
+            initPlayerInfo();
+            isSolo = false;
+            isTutorial = false;
+            statusTxt.innerText = "Connecting to Host...";
+            document.getElementById('btn-join').disabled = true;
+
+            peer = new Peer();
+            peer.on('open', (id) => {
+                isHost = false;
+                myId = id;
+                hostConn = peer.connect(roomId);
+                
+                hostConn.on('open', () => {
+                    document.getElementById('room-id-display').innerText = roomId;
+                    document.getElementById('qr-code').style.display = 'none';
+                    document.getElementById('btn-start').style.display = 'none';
+                    document.getElementById('btn-continue').style.display = 'none';
+                    gameState = 'LOBBY';
+                    switchScreen('lobby');
+                    setMatchmakingStatus('MATCHMAKING: syncing with host...');
+                    hostConn.send({ type: 'JOIN', id: myId, name: myName, trophies: myTrophies });
+                });
+
+                hostConn.on('data', (data) => handleNetworkData(data, roomId));
+                hostConn.on('close', () => { alert("Host disconnected"); leaveRoom(); });
+            });
+        }
+
+        function startSoloGame() {
+            initPlayerInfo();
+            isHost = true;
+            isSolo = true;
+            isTutorial = false;
+            myId = 'player_main';
+            
+            document.getElementById('btn-continue').innerText = 'Play Again';
+            document.getElementById('btn-continue').onclick = startSoloGame;
+
+            playersData[myId] = { name: myName, trophies: myTrophies, alive: true, board: createMatrix(12, 20) };
+            fillWithBots();
+            
+            startLocalGame();
+        }
+
+        // --- TUTORIAL ---
+        function startTutorial() {
+            initPlayerInfo();
+            isHost = true;
+            isSolo = true;
+            isTutorial = true;
+            myId = 'solo';
+            tutorialStep = 1;
+            
+            playersData[myId] = { name: myName, trophies: myTrophies, alive: true, board: createMatrix(12, 20) };
+            
+            document.getElementById('tutorial-box').style.display = 'block';
+            startLocalGame();
+            
+            dropInterval = 999999;
+            updateTutorialUI();
+        }
+
+        function advanceTutorial() {
+            if (!isTutorial) return;
+            tutorialStep++;
+            updateTutorialUI();
+        }
+
+        function updateTutorialUI() {
+            const title = document.getElementById('tut-title');
+            const msg = document.getElementById('tut-msg');
+            const btn = document.getElementById('tut-btn');
+            
+            title.innerText = `Tutorial Phase ${tutorialStep}/10`;
+            btn.style.display = 'inline-block';
+            btn.innerText = 'Next';
+
+            switch(tutorialStep) {
+                case 1:
+                    msg.innerText = "Welcome to Cyber Tetris Showdown 100! Let's cover key mechanics.";
+                    break;
+                case 2:
+                    msg.innerText = "Tap Left (←) or Right (→) controls to position your tetronimo.";
+                    btn.style.display = 'none';
+                    break;
+                case 3:
+                    msg.innerText = "Great! Tap Rotate (↺ or ↻) to orient the piece.";
+                    btn.style.display = 'none';
+                    break;
+                case 4:
+                    msg.innerText = "Press Down Arrow (⬇️) to instantly Hard Drop the piece.";
+                    btn.style.display = 'none';
+                    break;
+                case 5:
+                    msg.innerText = "Check your NEXT piece window on the right to plan ahead.";
+                    break;
+                case 6:
+                    msg.innerText = "Line clears generate Attack Charges! I've loaded 5 attack charges for you.";
+                    attackCharge = 5;
+                    document.getElementById('charge').innerText = attackCharge;
+                    break;
+                case 7:
+                    msg.innerText = "In 100-Player Battle Royale, click Target on opponent thumbnails to target them.";
+                    btn.style.display = 'none';
+                    playersData['dummy'] = { name: "Target_Dummy", trophies: 0, alive: true, board: createMatrix(12, 20) };
+                    setupOpponentViews();
+                    break;
+                case 8:
+                    msg.innerText = "Now press the Red Attack Swords (⚔️) to send Garbage lines!";
+                    btn.style.display = 'none';
+                    break;
+                case 9:
+                    msg.innerText = "Garbage lines never auto-decay. The only way to remove them is to complete them as full horizontal lines. When 2 players remain, 3-min Sudden Death begins!";
+                    break;
+                case 10:
+                    msg.innerText = "You're trained! Win battle royales against 99 players. Good luck!";
+                    btn.innerText = 'Finish';
+                    btn.onclick = () => {
+                        document.getElementById('tutorial-box').style.display = 'none';
+                        leaveRoom();
+                    };
+                    break;
+            }
+        }
+
+        function addPlayerToLobby(id, name, trophies) {
+            playersData[id] = { name, trophies, alive: true, board: createMatrix(12, 20) };
+            updateLobbyUI();
+            if (isHost && !isSolo) {
+                broadcastLobbyState();
+                if (gameState === 'LOBBY' && Object.keys(playersData).length >= 100) startGame();
+            }
+        }
+
+        function removePlayer(id) {
+            delete playersData[id];
+            updateLobbyUI();
+            if(gameState === 'PLAYING') {
+                if(!isSolo) checkMatchConditions();
+                setupOpponentViews(); 
+                updateAliveCount();
+            }
+            if (isHost && !isSolo) broadcastLobbyState();
+        }
+
+        function updateLobbyUI() {
+            const list = document.getElementById('lobby-players');
+            list.innerHTML = '';
+            let count = 0;
+            for (let id in playersData) {
+                count++;
+                let li = document.createElement('li');
+                li.innerHTML = `<span>${playersData[id].name} ${id===myId?'(YOU)':''}</span> <span>🏆 ${playersData[id].trophies}</span>`;
+                list.appendChild(li);
+            }
+            document.getElementById('player-count').innerText = count;
+        }
+
+        function sendNetworkMessage(msg) {
+            if (isSolo || isTutorial) return;
+            if (isHost) {
+                if (msg.type === 'GARBAGE') {
+                    if (msg.target === myId) receiveGarbage(msg.lines);
+                    else if (connections[msg.target]) connections[msg.target].send(msg);
+                } else {
+                    for (let id in connections) connections[id].send(msg);
+                }
+            } else if (hostConn) {
+                hostConn.send(msg); 
+            }
+        }
+
+        function handleNetworkData(data, senderId) {
+            switch(data.type) {
+                case 'JOIN':
+                    if (isHost) addPlayerToLobby(data.id, data.name, data.trophies);
+                    break;
+                case 'LOBBY_STATE':
+                    playersData = data.players;
+                    updateLobbyUI();
+                    break;
+                case 'MATCHMAKING_TICK':
+                    matchmakingSecondsLeft = data.seconds;
+                    setMatchmakingStatus(`MATCHMAKING: ${Math.max(0, data.seconds)}s — waiting for players...`);
+                    break;
+                case 'START':
+                    cancelAutoMatchmakingCountdown();
+                    startLocalGame();
+                    break;
+                case 'BOARD':
+                    if (playersData[data.id]) playersData[data.id].board = data.matrix;
+                    if (isHost) broadcastBoard(data.id, data.matrix); 
+                    break;
+                case 'GARBAGE':
+                    if (isHost) {
+                        if (data.target === myId) receiveGarbage(data.lines);
+                        else if (connections[data.target]) connections[data.target].send(data);
+                    } else if (data.target === myId) {
+                        receiveGarbage(data.lines);
+                    }
+                    break;
+                case 'DIED':
+                    if (playersData[data.id]) playersData[data.id].alive = false;
+                    if (isHost) {
+                        sendNetworkMessage(data); 
+                        checkMatchConditions();
+                    }
+                    autoSwitchTarget();
+                    updateAliveCount();
+                    break;
+                case 'SUDDEN_DEATH':
+                    triggerSuddenDeathUI();
+                    break;
+                case 'GAME_OVER':
+                    showEndScreen(data.winnerId === myId, data.winnerName);
+                    break;
+                case 'CONTINUE':
+                    switchScreen('lobby');
+                    gameState = 'LOBBY';
+                    setMatchmakingStatus('MATCHMAKING: waiting for host countdown...');
+                    break;
+                case 'ERROR':
+                    alert(data.msg);
+                    leaveRoom();
+                    break;
+            }
+        }
+
+        function broadcastLobbyState() {
+            if (isSolo) return;
+            const serializablePlayers = {};
+            for (const [id, p] of Object.entries(playersData)) {
+                serializablePlayers[id] = {
+                    name: p.name,
+                    trophies: p.trophies,
+                    alive: p.alive,
+                    isBot: !!p.isBot,
+                    board: p.board || createMatrix(12, 20)
+                };
+            }
+            sendNetworkMessage({ type: 'LOBBY_STATE', players: serializablePlayers });
+        }
+
+        function broadcastBoard(id = myId, matrix = arena) {
+            if (!isSolo) sendNetworkMessage({ type: 'BOARD', id, matrix });
+        }
+
+        // --- GAMEPLAY FLOW & MUSIC LOGIC ---
+
+        function startGame() {
+            if (!isHost || isSolo || (gameState !== 'LOBBY' && gameState !== 'MENU')) return;
+            cancelAutoMatchmakingCountdown();
+            gameState = 'STARTING';
+            fillWithBots(); // Fill every missing slot after the 10-second search window.
+            broadcastLobbyState(); // Ensure every client knows the bot roster before START.
+            setMatchmakingStatus('MATCH FOUND — launching with ' + Object.keys(playersData).length + ' players');
+            sendNetworkMessage({ type: 'START' });
+            startLocalGame();
+        }
+
+        function startLocalGame() {
+            gameState = 'PLAYING';
+            arena = createMatrix(12, 20);
+            nextPieceMatrix = null;
+            player.score = 0;
+            attackCharge = 0;
+            dropInterval = isTutorial ? 999999 : 1000;
+            isSuddenDeath = false;
+            clearInterval(suddenDeathInterval);
+            document.getElementById('sudden-death-bar').style.display = 'none';
+
+            document.getElementById('score').innerText = 0;
+            document.getElementById('charge').innerText = 0;
+            
+            for(let id in playersData) {
+                playersData[id].alive = true;
+                playersData[id].board = createMatrix(12, 20);
+            }
+
+            setupOpponentViews();
+            playerReset();
+            
+            // Start at the 100-player phase. updateAliveCount() handles 50/10/2 thresholds.
+            playMusicTrack(MUSIC_100);
+
+            if (isHost) startBotSimulation();
+
+            switchScreen('game');
+            updateAliveCount();
+            lastTime = performance.now();
+            update();
+        }
+
+        function updateAliveCount() {
+            let count = 0;
+            for (let id in playersData) {
+                if (playersData[id].alive) count++;
+            }
+            document.getElementById('alive-count').innerText = count;
+            updateMusicForAliveCount(count);
+        }
+
+        function setupOpponentViews() {
+            opponentsContainer.innerHTML = '';
+            targetId = null;
+            document.getElementById('current-target-name').innerText = 'None';
+
+            for (let id in playersData) {
+                if (id === myId) continue;
+                
+                let div = document.createElement('div');
+                div.className = 'opponent' + (playersData[id].isBot ? ' is-bot' : '');
+                div.innerHTML = `
+                    <div class="opponent-name">${playersData[id].name}</div>
+                    <canvas id="canvas-${id}" width="120" height="200"></canvas>
+                    <button class="target-btn" id="btn-${id}" onclick="setTarget('${id}')">Target</button>
+                `;
+                opponentsContainer.appendChild(div);
+
+                let ctx = document.getElementById(`canvas-${id}`).getContext('2d');
+                ctx.scale(10, 10);
+                playersData[id].ctx = ctx;
+
+                if (!targetId && !isTutorial) setTarget(id); 
+            }
+        }
+
+        function drawOpponent(id) {
+            const opp = playersData[id];
+            if (!opp || !opp.ctx) return;
+            
+            opp.ctx.fillStyle = opp.alive ? '#030611' : '#220011'; 
+            opp.ctx.fillRect(0, 0, 120, 200);
+            drawMatrix(opp.board, {x:0, y:0}, opp.ctx);
+            
+            if (!opp.alive) {
+                opp.ctx.fillStyle = 'rgba(255,0,85,0.4)';
+                opp.ctx.fillRect(0,0,12,20);
+            }
+        }
+
+        function setTarget(id) {
+            if (isTutorial && tutorialStep === 7 && id === 'dummy') {
+                advanceTutorial();
+            }
+
+            if(targetId) {
+                let oldBtn = document.getElementById(`btn-${targetId}`);
+                if(oldBtn) oldBtn.classList.remove('selected');
+            }
+            targetId = id;
+            let newBtn = document.getElementById(`btn-${id}`);
+            if(newBtn) newBtn.classList.add('selected');
+            document.getElementById('current-target-name').innerText = playersData[id].name;
+        }
+
+        function autoSwitchTarget() {
+            if (targetId && playersData[targetId] && !playersData[targetId].alive) {
+                for(let id in playersData) {
+                    if (id !== myId && playersData[id].alive) {
+                        setTarget(id);
+                        return;
+                    }
+                }
+                document.getElementById('current-target-name').innerText = 'None';
+                targetId = null;
+            }
+        }
+
+        function checkMatchConditions() {
+            if (!isHost || isTutorial) return;
+            
+            let alivePlayers = Object.keys(playersData).filter(id => playersData[id].alive);
+            
+            // Trigger 2-Player Sudden Death Mode
+            if (alivePlayers.length === 2 && !isSuddenDeath) {
+                isSuddenDeath = true;
+                sendNetworkMessage({ type: 'SUDDEN_DEATH' });
+                triggerSuddenDeathUI();
+            }
+
+            // Game Victory / Over
+            if (alivePlayers.length <= 1) {
+                let winnerId = alivePlayers.length === 1 ? alivePlayers[0] : null;
+                let winnerName = winnerId ? playersData[winnerId].name : 'No one';
+                
+                sendNetworkMessage({ type: 'GAME_OVER', winnerId, winnerName });
+                showEndScreen(winnerId === myId, winnerName);
+            }
+        }
+
+        function triggerSuddenDeathUI() {
+            isSuddenDeath = true;
+            playMusicTrack(MUSIC_2);
+            
+            document.getElementById('sudden-death-bar').style.display = 'block';
+            suddenDeathTimer = 180; // 3 Minutes
+            
+            clearInterval(suddenDeathInterval);
+            suddenDeathInterval = setInterval(() => {
+                suddenDeathTimer--;
+                
+                let mins = Math.floor(suddenDeathTimer / 60);
+                let secs = suddenDeathTimer % 60;
+                document.getElementById('sd-timer').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                
+                let percentage = (suddenDeathTimer / 180) * 100;
+                document.getElementById('sd-progress').style.width = percentage + '%';
+
+                // Sudden Death Garbage Surge: Every 15 seconds, inject 1 garbage line to all
+                if (suddenDeathTimer % 15 === 0 && suddenDeathTimer > 0) {
+                    receiveGarbage(1);
+                }
+
+                if (suddenDeathTimer <= 0) {
+                    clearInterval(suddenDeathInterval);
+                    if (isHost) checkMatchConditions();
+                }
+            }, 1000);
+        }
+
+        function showEndScreen(isWinner, winnerName) {
+            gameState = 'END';
+            cancelAnimationFrame(animationId);
+            stopBotSimulation();
+            stopMusic();
+            clearInterval(suddenDeathInterval);
+            
+            const title = document.getElementById('end-title');
+            const sub = document.getElementById('end-subtitle');
+            const continueBtn = document.getElementById('btn-continue');
+            
+            if (isSolo && Object.keys(playersData).length === 1) {
+                title.innerText = "GAME OVER";
+                title.style.color = "var(--neon-pink)";
+                sub.innerText = `Final Score: ${player.score}`;
+                continueBtn.style.display = 'inline-block';
+            } else if (isTutorial) {
+                leaveRoom();
+                return;
+            } else {
+                if (isWinner) {
+                    title.innerText = "VICTORY ROYALE!";
+                    title.style.color = "var(--neon-green)";
+                    sub.innerText = "You defeated 99 opponents to become champion!";
+                    myTrophies += 10;
+                    localStorage.setItem('tetrisTrophies', myTrophies);
+                    document.getElementById('menu-trophies').innerText = myTrophies;
+                } else {
+                    title.innerText = "ELIMINATED";
+                    title.style.color = "var(--neon-pink)";
+                    sub.innerText = winnerName ? `${winnerName} won the match.` : "You were knocked out.";
+                }
+                if (isHost) continueBtn.style.display = 'inline-block';
+            }
+            
+            switchScreen('end');
+        }
+
+        function continueToLobby() {
+            if (!isHost) return;
+            sendNetworkMessage({ type: 'CONTINUE' });
+            gameState = 'LOBBY';
+            switchScreen('lobby');
+            startAutoMatchmakingCountdown();
+        }
+
+        function leaveRoom() {
+            if (peer) peer.destroy();
+            peer = null;
+            connections = {};
+            hostConn = null;
+            playersData = {};
+            stopMusic();
+            stopBotSimulation();
+            cancelAutoMatchmakingCountdown();
+            clearInterval(suddenDeathInterval);
+            document.getElementById('btn-create').disabled = false;
+            document.getElementById('btn-join').disabled = false;
+            statusTxt.innerText = "";
+            document.getElementById('tutorial-box').style.display = 'none';
+            switchScreen('menu');
+            gameState = 'MENU';
+        }
+
+        // Key controls
+        document.addEventListener('keydown', event => {
+            if(gameState !== 'PLAYING') return;
+            if (event.keyCode === 37) playerMove(-1);
+            else if (event.keyCode === 39) playerMove(1);
+            else if (event.keyCode === 40) playerHardDrop();
+            else if (event.keyCode === 81) playerRotate(-1);
+            else if (event.keyCode === 87 || event.keyCode === 38) playerRotate(1);
+        });
+
+    </script>
+</body>
+</html>
